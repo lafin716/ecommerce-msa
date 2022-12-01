@@ -7,9 +7,16 @@ import com.lafin.userservice.vo.ResponseOrder;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.convention.MatchingStrategies;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.core.env.Environment;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,7 +26,21 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
-    private final BCryptPasswordEncoder encoder;
+    private final BCryptPasswordEncoder bCryptPasswordEncoder;
+    private final Environment env;
+    private final RestTemplate restTemplate;
+
+    @Override
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        UserEntity userEntity = userRepository.findByEmail(email);
+        if (userEntity == null) {
+            throw new UsernameNotFoundException("유저 정보를 찾을 수 없습니다.");
+        }
+
+        return new User(userEntity.getEmail(),
+                userEntity.getEncryptedPassword(),
+                new ArrayList<>());
+    }
 
     @Override
     public UserDto createUser(UserDto userDto) {
@@ -28,7 +49,7 @@ public class UserServiceImpl implements UserService {
         ModelMapper mapper = new ModelMapper();
         mapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
         UserEntity userEntity = mapper.map(userDto, UserEntity.class);
-        userEntity.setEncryptedPassword(encoder.encode(userDto.getPassword()));
+        userEntity.setEncryptedPassword(bCryptPasswordEncoder.encode(userDto.getPassword()));
         userRepository.save(userEntity);
 
         UserDto user = mapper.map(userEntity, UserDto.class);
@@ -38,6 +59,27 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserDto getUserByUserId(String userId) {
         UserEntity userEntity = userRepository.findByUserId(userId);
+        if (userEntity == null) {
+            throw new UsernameNotFoundException("회원 정보를 찾을 수 없습니다.");
+        }
+
+        ModelMapper mapper = new ModelMapper();
+        UserDto userDto = mapper.map(userEntity, UserDto.class);
+
+        String orderUrl = String.format(env.getProperty("order_service.url"), userId);
+        ResponseEntity<List<ResponseOrder>> orderListResponse = restTemplate.exchange(orderUrl,
+            HttpMethod.GET,
+            null,
+            new ParameterizedTypeReference<List<ResponseOrder>>() {});
+        List<ResponseOrder> orders = orderListResponse.getBody();
+        userDto.setOrders(orders);
+
+        return userDto;
+    }
+
+    @Override
+    public UserDto getUserDetailsByEmail(String email) {
+        UserEntity userEntity = userRepository.findByEmail(email);
         if (userEntity == null) {
             throw new UsernameNotFoundException("회원 정보를 찾을 수 없습니다.");
         }

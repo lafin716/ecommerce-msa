@@ -1,0 +1,6 @@
+encrypt:
+#  key: lafin716
+  key-store:
+    location: file://${user.home}/Documents/data/keystore/apiEncKey.jks
+    password: lafin1234
+    alias: apiEncKey

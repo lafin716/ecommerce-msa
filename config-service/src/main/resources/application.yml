@@ -1,0 +1,28 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-service
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: guest
+    password: guest
+#  profiles:
+#    active: native
+  cloud:
+    config:
+      server:
+#        native:
+#          search-locations: file://${user.home}
+        git:
+          uri: https://github.com/lafin716/ecommerce-config
+          username: lafin716
+          password: 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
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, busrefresh
